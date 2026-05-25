@@ -32,8 +32,8 @@ function isWordTranslationCached(
   cache: WordTranslationCache
 ): boolean {
   const entry = cache[lang]?.[word.id]
-  if (!entry?.exampleNative?.trim()) return false
-  if (entry.meaning) return true
+  if (entry?.meaning?.text?.trim()) return true
+  if (entry?.exampleNative?.trim()) return true
   return !!resolveWordMeaningTranslation(word.id, word.meaning, lang, {
     allowPlaceholder: false,
   })
@@ -124,7 +124,9 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
 
         for (const [idKey, bundle] of Object.entries(raw)) {
           const id = Number(idKey)
-          if (Number.isNaN(id) || !bundle?.example?.trim()) continue
+          const meaningText = bundle.meaning?.trim() ?? ""
+          const exampleText = bundle.example?.trim() ?? ""
+          if (Number.isNaN(id) || (!meaningText && !exampleText)) continue
 
           const manual = resolveWordMeaningTranslation(
             id,
@@ -133,13 +135,12 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
             { allowPlaceholder: false }
           )
 
-          const meaningText = bundle.meaning?.trim()
           geminiEntries[id] = {
             meaning: manual ?? {
-              text: meaningText || bundle.example,
+              text: meaningText || exampleText,
               source: "gemini",
             },
-            exampleNative: bundle.example.trim(),
+            exampleNative: exampleText,
           }
         }
 
