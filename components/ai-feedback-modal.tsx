@@ -22,6 +22,7 @@ interface AIFeedbackModalProps {
   feedback: string
   translationLanguage?: LanguageCode
   feedbackTranslation?: ResolvedTranslation | null
+  isSuccess?: boolean
 }
 
 export function AIFeedbackModal({
@@ -33,6 +34,7 @@ export function AIFeedbackModal({
   feedback,
   translationLanguage = "ko",
   feedbackTranslation,
+  isSuccess = false,
 }: AIFeedbackModalProps) {
   const [showNativeFeedback, setShowNativeFeedback] = useState(false)
   const lang = getLanguage(translationLanguage)
@@ -85,13 +87,13 @@ export function AIFeedbackModal({
   }, [])
 
   useEffect(() => {
-    if (isOpen && !isLoading && correctedText) {
+    if (isOpen && !isLoading && isSuccess && correctedText) {
       const timer = setTimeout(() => {
         fireConfetti()
       }, 300)
       return () => clearTimeout(timer)
     }
-  }, [isOpen, isLoading, correctedText, fireConfetti])
+  }, [isOpen, isLoading, isSuccess, correctedText, fireConfetti])
 
   useEffect(() => {
     if (!isOpen) {

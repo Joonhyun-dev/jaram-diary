@@ -7,29 +7,13 @@ import { AIFeedbackModal } from "@/components/ai-feedback-modal"
 import { StreakCounter } from "@/components/streak-counter"
 import { LanguageSelector } from "@/components/language-selector"
 import { Sparkles, BookOpen } from "lucide-react"
+import type { CorrectDiaryResponse } from "@/lib/correct-diary"
 import {
   type LanguageCode,
   getLanguage,
   resolveWordMeaningTranslation,
   resolveFeedbackTranslation,
 } from "@/lib/translations"
-
-function simulateAIFeedback(text: string): Promise<{ corrected: string; feedback: string }> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const corrected = text
-        .replace(/좋앗어요/g, "좋았어요")
-        .replace(/햇어요/g, "했어요")
-        .replace(/잇어요/g, "있어요")
-
-      resolve({
-        corrected: corrected,
-        feedback:
-          "문장을 정말 잘 썼어요! 오늘 배운 단어를 사용해서 멋진 일기를 완성했네요. 계속 이렇게 열심히 써보세요! 💕",
-      })
-    }, 2000)
-  })
-}
 
 interface JaramDiaryPageProps {
   todayWords: WordData[]
@@ -39,11 +23,13 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
   const [diaryText, setDiaryText] = useState("")
   const [selectedWords, setSelectedWords] = useState<string[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isModalLoading, setIsModalLoading] = useState(false)
+  const [isCorrectionSuccess, setIsCorrectionSuccess] = useState(false)
   const [feedback, setFeedback] = useState({
     original: "",
     corrected: "",
-    message: "",
+    feedbackKo: "",
+    feedbackTranslation: "",
   })
   const [streak] = useState(0)
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("ko")
@@ -59,34 +45,48 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
     setSelectedWords((prev) => (prev.includes(word) ? prev : [...prev, word]))
   }, [])
 
-  const handleSubmit = useCallback(async () => {
-    if (diaryText.trim().length < 5) return
-
+  const handleCorrectionStart = useCallback(() => {
     setIsModalOpen(true)
-    setIsLoading(true)
-    setFeedback({ original: diaryText, corrected: "", message: "" })
+    setIsModalLoading(true)
+    setIsCorrectionSuccess(false)
+    setFeedback({
+      original: diaryText,
+      corrected: "",
+      feedbackKo: "",
+      feedbackTranslation: "",
+    })
+  }, [diaryText])
 
-    try {
-      const result = await simulateAIFeedback(diaryText)
-      setFeedback({
-        original: diaryText,
-        corrected: result.corrected,
-        message: result.feedback,
-      })
-    } catch {
-      setFeedback({
-        original: diaryText,
-        corrected: diaryText,
-        message: "잘 썼어요! 오늘도 열심히 일기를 썼네요! 🌟",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const handleCorrectionComplete = useCallback((result: CorrectDiaryResponse) => {
+    setFeedback({
+      original: result.original,
+      corrected: result.corrected,
+      feedbackKo: result.feedback_ko,
+      feedbackTranslation: result.feedback_translation,
+    })
+    setIsCorrectionSuccess(true)
+    setIsModalLoading(false)
+  }, [])
+
+  const handleCorrectionError = useCallback((message: string) => {
+    setFeedback({
+      original: diaryText,
+      corrected: diaryText,
+      feedbackKo: message,
+      feedbackTranslation: "",
+    })
+    setIsCorrectionSuccess(false)
+    setIsModalLoading(false)
   }, [diaryText])
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false)
+    setIsModalLoading(false)
   }, [])
+
+  const feedbackTranslation = resolveFeedbackTranslation(selectedLanguage, {
+    geminiText: feedback.feedbackTranslation,
+  })
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,8 +158,10 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
           <DiaryInput
             value={diaryText}
             onChange={setDiaryText}
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
+            selectedLanguage={selectedLanguage}
+            onCorrectionStart={handleCorrectionStart}
+            onCorrectionComplete={handleCorrectionComplete}
+            onCorrectionError={handleCorrectionError}
           />
         </section>
 
@@ -182,12 +184,13 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
       <AIFeedbackModal
         isOpen={isModalOpen}
         onClose={handleModalClose}
-        isLoading={isLoading}
+        isLoading={isModalLoading}
         originalText={feedback.original}
         correctedText={feedback.corrected}
-        feedback={feedback.message}
+        feedback={feedback.feedbackKo}
         translationLanguage={selectedLanguage}
-        feedbackTranslation={resolveFeedbackTranslation(selectedLanguage)}
+        feedbackTranslation={feedbackTranslation}
+        isSuccess={isCorrectionSuccess}
       />
     </div>
   )
