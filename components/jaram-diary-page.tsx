@@ -11,6 +11,7 @@ import type { CorrectDiaryResponse } from "@/lib/correct-diary"
 import { appendWordToDiary } from "@/lib/diary"
 import { trimExample, trimMeaning } from "@/lib/translate-words"
 import { getUiCopy } from "@/lib/ui-copy"
+import { upsertWordbookEntry } from "@/lib/wordbook"
 import {
   type CachedWordTranslation,
   type LanguageCode,
@@ -173,9 +174,17 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLanguage, todayWords])
 
-  const handleWordClick = useCallback((word: string) => {
-    setDiaryText((prev) => appendWordToDiary(prev, word))
-    setSelectedWords((prev) => (prev.includes(word) ? prev : [...prev, word]))
+  const handleWordClick = useCallback((word: WordData) => {
+    setDiaryText((prev) => appendWordToDiary(prev, word.word))
+    setSelectedWords((prev) => (prev.includes(word.word) ? prev : [...prev, word.word]))
+    upsertWordbookEntry({
+      id: word.id,
+      word: word.word,
+      pronunciation: word.pronunciation,
+      meaning: word.meaning,
+      exampleSentence: word.exampleSentence,
+      savedAt: new Date().toISOString(),
+    })
   }, [])
 
   const handleCorrectionStart = useCallback(() => {

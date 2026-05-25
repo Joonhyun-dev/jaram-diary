@@ -18,7 +18,7 @@ export interface WordData {
 
 interface WordCardProps {
   wordData: WordData
-  onClick: (word: string) => void
+  onClick: (word: WordData) => void
   isSelected: boolean
   uiLanguage: LanguageCode
   translationLanguage?: LanguageCode
@@ -55,7 +55,7 @@ export function WordCard({
         colorClasses[wordData.color],
         isSelected && "ring-4 ring-primary ring-offset-2 scale-105"
       )}
-      onClick={() => onClick(wordData.word)}
+      onClick={() => onClick(wordData)}
     >
       <div className="absolute top-2 right-2 w-6 h-6 opacity-30">
         <svg viewBox="0 0 24 24" fill="currentColor">
