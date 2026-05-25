@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { ChevronDown, ChevronUp, Volume2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { type LanguageCode, LANGUAGES } from "@/lib/translations"
+import { type LanguageCode, type ResolvedTranslation } from "@/lib/translations"
+import { WordTranslationPanel } from "@/components/word-translation-panel"
 
 export interface WordData {
   id: number
@@ -19,7 +20,7 @@ interface WordCardProps {
   onClick: (word: string) => void
   isSelected: boolean
   translationLanguage?: LanguageCode
-  translatedMeaning?: string
+  meaningTranslation?: ResolvedTranslation | null
 }
 
 const colorClasses = {
@@ -28,9 +29,15 @@ const colorClasses = {
   pink: "bg-word-pink hover:bg-word-pink/80 border-pink-300",
 }
 
-export function WordCard({ wordData, onClick, isSelected, translationLanguage, translatedMeaning }: WordCardProps) {
-  const showTranslation = translationLanguage && translationLanguage !== "ko" && translatedMeaning
-  const translationLang = LANGUAGES.find((l) => l.code === translationLanguage)
+export function WordCard({
+  wordData,
+  onClick,
+  isSelected,
+  translationLanguage,
+  meaningTranslation,
+}: WordCardProps) {
+  const showTranslation =
+    translationLanguage && translationLanguage !== "ko" && meaningTranslation
   const [showHint, setShowHint] = useState(false)
 
   return (
@@ -72,10 +79,10 @@ export function WordCard({ wordData, onClick, isSelected, translationLanguage, t
       <div className="text-center mb-3">
         <p className="text-foreground/90 font-medium">{wordData.meaning}</p>
         {showTranslation && (
-          <p className="text-muted-foreground text-xs mt-1 flex items-center justify-center gap-1">
-            <span aria-hidden="true">{translationLang?.flag}</span>
-            <span>{translatedMeaning}</span>
-          </p>
+          <WordTranslationPanel
+            language={translationLanguage}
+            translation={meaningTranslation}
+          />
         )}
       </div>
 

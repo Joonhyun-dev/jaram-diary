@@ -32,20 +32,26 @@ export function LanguageSelector({
             "transition-all duration-200 text-sm font-medium text-foreground",
             "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1"
           )}
-          aria-label="언어 선택"
+          aria-label={`모국어 선택: ${current.label}`}
         >
           <span className="text-lg leading-none" aria-hidden="true">
             {current.flag}
           </span>
-          <span className="hidden sm:block">{current.label}</span>
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <span className="hidden sm:flex flex-col items-start leading-tight">
+            <span className="text-[10px] text-muted-foreground font-normal">모국어</span>
+            <span>{current.label}</span>
+          </span>
+          <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
         align="end"
-        className="rounded-2xl border-2 border-border shadow-xl p-1 min-w-[160px]"
+        className="rounded-2xl border-2 border-border shadow-xl p-1 min-w-[200px]"
       >
+        <p className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+          모국어 번역
+        </p>
         {LANGUAGES.map((lang: Language) => (
           <DropdownMenuItem
             key={lang.code}

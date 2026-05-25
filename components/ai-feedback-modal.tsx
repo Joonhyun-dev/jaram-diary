@@ -1,12 +1,17 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, Sparkles, ArrowRight, Star } from "lucide-react"
+import { X, Sparkles, ArrowRight, Star, Languages, ChevronDown, ChevronUp } from "lucide-react"
 import confetti from "canvas-confetti"
 import { cn } from "@/lib/utils"
-import { type LanguageCode, LANGUAGES } from "@/lib/translations"
+import {
+  getLanguage,
+  getNativeTranslationButtonLabel,
+  type LanguageCode,
+  type ResolvedTranslation,
+} from "@/lib/translations"
 
 interface AIFeedbackModalProps {
   isOpen: boolean
@@ -16,7 +21,7 @@ interface AIFeedbackModalProps {
   correctedText: string
   feedback: string
   translationLanguage?: LanguageCode
-  translatedFeedback?: string
+  feedbackTranslation?: ResolvedTranslation | null
 }
 
 export function AIFeedbackModal({
@@ -26,11 +31,15 @@ export function AIFeedbackModal({
   originalText,
   correctedText,
   feedback,
-  translationLanguage,
-  translatedFeedback,
+  translationLanguage = "ko",
+  feedbackTranslation,
 }: AIFeedbackModalProps) {
-  const showTranslation = translationLanguage && translationLanguage !== "ko" && translatedFeedback
-  const translationLang = LANGUAGES.find((l) => l.code === translationLanguage)
+  const [showNativeFeedback, setShowNativeFeedback] = useState(false)
+  const lang = getLanguage(translationLanguage)
+  const canShowNative =
+    translationLanguage !== "ko" && feedbackTranslation !== null && feedbackTranslation !== undefined
+  const isPlaceholder = feedbackTranslation?.source === "placeholder"
+
   const fireConfetti = useCallback(() => {
     const count = 200
     const defaults = {
@@ -84,20 +93,28 @@ export function AIFeedbackModal({
     }
   }, [isOpen, isLoading, correctedText, fireConfetti])
 
+  useEffect(() => {
+    if (!isOpen) {
+      setShowNativeFeedback(false)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    setShowNativeFeedback(false)
+  }, [translationLanguage])
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent 
+      <DialogContent
         className="max-w-md mx-auto bg-card border-2 border-border rounded-3xl p-0 overflow-hidden"
         showCloseButton={false}
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
         {isLoading ? (
-          /* Loading state */
           <div className="p-8 text-center">
             <DialogTitle className="sr-only">AI 선생님이 읽고 있어요</DialogTitle>
             <div className="relative w-24 h-24 mx-auto mb-6">
-              {/* Cute animated character */}
               <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
               <div className="relative w-24 h-24 rounded-full bg-primary flex items-center justify-center animate-bounce-soft">
                 <span className="text-4xl">✍️</span>
@@ -107,8 +124,7 @@ export function AIFeedbackModal({
               AI 선생님이 읽고 있어요...
             </h3>
             <p className="text-muted-foreground">잠시만 기다려 주세요!</p>
-            
-            {/* Animated dots */}
+
             <div className="flex justify-center gap-2 mt-4">
               {[0, 1, 2].map((i) => (
                 <div
@@ -122,35 +138,31 @@ export function AIFeedbackModal({
             </div>
           </div>
         ) : !isLoading && correctedText ? (
-          /* Result state */
           <div className="relative">
-            {/* Close button */}
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-foreground/10 transition-colors z-10"
+              aria-label="닫기"
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
 
-            {/* Header with sticker */}
             <div className="bg-gradient-to-b from-primary/30 to-transparent pt-6 pb-8 px-6 text-center">
               <DialogTitle className="sr-only">AI 선생님의 피드백</DialogTitle>
               <div className="relative inline-block">
                 <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg animate-bounce-soft">
                   <span className="text-4xl">⭐</span>
                 </div>
-                {/* Floating stars */}
                 <Star className="absolute -top-2 -left-2 w-6 h-6 text-yellow-400 fill-yellow-400 animate-float" />
-                <Star className="absolute -top-1 -right-3 w-4 h-4 text-yellow-400 fill-yellow-400 animate-float" style={{ animationDelay: "0.5s" }} />
+                <Star
+                  className="absolute -top-1 -right-3 w-4 h-4 text-yellow-400 fill-yellow-400 animate-float"
+                  style={{ animationDelay: "0.5s" }}
+                />
               </div>
-              <h3 className="text-2xl font-bold text-foreground mt-4">
-                잘했어요! 🎉
-              </h3>
+              <h3 className="text-2xl font-bold text-foreground mt-4">잘했어요! 🎉</h3>
             </div>
 
-            {/* Content */}
             <div className="px-6 pb-6 -mt-2">
-              {/* Original sentence */}
               <div className="mb-4">
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
                   내가 쓴 문장
@@ -160,14 +172,12 @@ export function AIFeedbackModal({
                 </div>
               </div>
 
-              {/* Arrow */}
               <div className="flex justify-center my-3">
                 <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
                   <ArrowRight className="w-5 h-5 text-secondary-foreground rotate-90" />
                 </div>
               </div>
 
-              {/* Corrected sentence */}
               <div className="mb-4">
                 <label className="text-sm font-medium text-muted-foreground mb-2 block flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
@@ -178,49 +188,118 @@ export function AIFeedbackModal({
                 </div>
               </div>
 
-              {/* Feedback bubble */}
-              <div className="relative mb-6">
+              <div className="relative mb-4">
                 <div className="absolute -top-2 left-6 w-4 h-4 bg-secondary rotate-45" />
-                <div className="p-4 bg-secondary rounded-2xl space-y-2">
+                <div className="p-4 bg-secondary rounded-2xl">
                   <p className="text-secondary-foreground">
                     <span className="font-bold">AI 선생님:</span> {feedback}
                   </p>
-                  {showTranslation && (
-                    <div className="border-t border-secondary-foreground/10 pt-2 flex items-start gap-1.5">
-                      <span className="text-base leading-none mt-0.5" aria-hidden="true">
-                        {translationLang?.flag}
-                      </span>
-                      <p className="text-secondary-foreground/80 text-sm">
-                        {translatedFeedback}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Praise sticker row */}
+              {canShowNative && (
+                <div className="mb-4 space-y-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowNativeFeedback((prev) => !prev)}
+                    className={cn(
+                      "w-full h-11 rounded-2xl border-2 font-semibold text-sm",
+                      "flex items-center justify-center gap-2",
+                      showNativeFeedback
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-card hover:border-primary/40"
+                    )}
+                  >
+                    <Languages className="w-4 h-4 shrink-0" />
+                    <span className="truncate">
+                      {getNativeTranslationButtonLabel(translationLanguage)}
+                    </span>
+                    {showNativeFeedback ? (
+                      <ChevronUp className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    )}
+                  </Button>
+
+                  {showNativeFeedback && feedbackTranslation && (
+                    <div
+                      className={cn(
+                        "rounded-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-200",
+                        isPlaceholder
+                          ? "border-2 border-dashed border-primary/30 bg-primary/5"
+                          : "border-2 border-primary/20 bg-primary/10"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg" aria-hidden="true">
+                          {lang.flag}
+                        </span>
+                        <span className="text-xs font-bold text-primary uppercase tracking-wide">
+                          {lang.nativeLabel} 피드백
+                        </span>
+                        {feedbackTranslation.source === "gemini" && (
+                          <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
+                            <Sparkles className="w-3 h-3" />
+                            Gemini
+                          </span>
+                        )}
+                        {isPlaceholder && (
+                          <span className="ml-auto text-[10px] text-muted-foreground font-medium">
+                            샘플 번역
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        className={cn(
+                          "text-sm leading-relaxed",
+                          isPlaceholder
+                            ? "text-muted-foreground italic"
+                            : "text-foreground font-medium"
+                        )}
+                      >
+                        {feedbackTranslation.text}
+                      </p>
+                      {isPlaceholder && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">
+                          Google Gemini AI 연동 후 실제 일기 내용에 맞는 모국어 피드백이
+                          표시됩니다.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-center gap-4 mb-4">
-                <div className={cn(
-                  "w-16 h-16 rounded-full bg-word-yellow flex items-center justify-center",
-                  "shadow-md animate-wiggle"
-                )}>
+                <div
+                  className={cn(
+                    "w-16 h-16 rounded-full bg-word-yellow flex items-center justify-center",
+                    "shadow-md animate-wiggle"
+                  )}
+                >
                   <span className="text-2xl">👍</span>
                 </div>
-                <div className={cn(
-                  "w-16 h-16 rounded-full bg-word-mint flex items-center justify-center",
-                  "shadow-md animate-wiggle"
-                )} style={{ animationDelay: "0.2s" }}>
+                <div
+                  className={cn(
+                    "w-16 h-16 rounded-full bg-word-mint flex items-center justify-center",
+                    "shadow-md animate-wiggle"
+                  )}
+                  style={{ animationDelay: "0.2s" }}
+                >
                   <span className="text-2xl">🌟</span>
                 </div>
-                <div className={cn(
-                  "w-16 h-16 rounded-full bg-word-pink flex items-center justify-center",
-                  "shadow-md animate-wiggle"
-                )} style={{ animationDelay: "0.4s" }}>
+                <div
+                  className={cn(
+                    "w-16 h-16 rounded-full bg-word-pink flex items-center justify-center",
+                    "shadow-md animate-wiggle"
+                  )}
+                  style={{ animationDelay: "0.4s" }}
+                >
                   <span className="text-2xl">💪</span>
                 </div>
               </div>
 
-              {/* Close button */}
               <Button
                 onClick={onClose}
                 className={cn(
