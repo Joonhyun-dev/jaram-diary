@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { WordCard, type WordData } from "@/components/word-card"
 import { DiaryInput } from "@/components/diary-input"
 import { AIFeedbackModal } from "@/components/ai-feedback-modal"
@@ -8,15 +8,43 @@ import { StreakCounter } from "@/components/streak-counter"
 import { LanguageSelector } from "@/components/language-selector"
 import { Sparkles, BookOpen } from "lucide-react"
 import type { CorrectDiaryResponse } from "@/lib/correct-diary"
+import { appendWordToDiary } from "@/lib/diary"
+import { trimExample, trimMeaning } from "@/lib/translate-words"
+import { getUiCopy } from "@/lib/ui-copy"
 import {
+  type CachedWordTranslation,
   type LanguageCode,
+  type WordTranslationCache,
   getLanguage,
-  resolveWordMeaningTranslation,
+  getWordExampleNative,
+  getWordMeaningDisplay,
   resolveFeedbackTranslation,
+  resolveWordMeaningTranslation,
 } from "@/lib/translations"
 
 interface JaramDiaryPageProps {
   todayWords: WordData[]
+}
+
+function isWordTranslationCached(
+  word: WordData,
+  lang: LanguageCode,
+  cache: WordTranslationCache
+): boolean {
+  const entry = cache[lang]?.[word.id]
+  if (!entry?.exampleNative?.trim()) return false
+  if (entry.meaning) return true
+  return !!resolveWordMeaningTranslation(word.id, word.meaning, lang, {
+    allowPlaceholder: false,
+  })
+}
+
+function wordsNeedingFetch(
+  words: WordData[],
+  lang: LanguageCode,
+  cache: WordTranslationCache
+): WordData[] {
+  return words.filter((w) => !isWordTranslationCached(w, lang, cache))
 }
 
 export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
@@ -33,15 +61,119 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
   })
   const [streak] = useState(0)
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("ko")
+  const [wordTranslationCache, setWordTranslationCache] =
+    useState<WordTranslationCache>({})
+  const [isTranslatingWords, setIsTranslatingWords] = useState(false)
+  const [wordTranslationError, setWordTranslationError] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   const activeLanguage = getLanguage(selectedLanguage)
   const showMultilingualHint = selectedLanguage !== "ko"
+  const ui = (key: Parameters<typeof getUiCopy>[0], vars?: Record<string, string>) =>
+    getUiCopy(key, selectedLanguage, vars)
+
+  useEffect(() => {
+    if (selectedLanguage === "ko") {
+      setWordTranslationError(false)
+      setIsTranslatingWords(false)
+      return
+    }
+
+    const toFetch = wordsNeedingFetch(todayWords, selectedLanguage, wordTranslationCache)
+    if (toFetch.length === 0) {
+      setWordTranslationError(false)
+      setIsTranslatingWords(false)
+      return
+    }
+
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setIsTranslatingWords(true)
+    setWordTranslationError(false)
+
+    const fetchTranslations = async () => {
+      try {
+        const response = await fetch("/api/translate-words", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            language: selectedLanguage,
+            words: toFetch.map((w) => ({
+              id: w.id,
+              word: w.word,
+              meaning: trimMeaning(w.meaning),
+              example: trimExample(w.exampleSentence),
+            })),
+          }),
+          signal: controller.signal,
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "단어 번역에 실패했습니다.")
+        }
+
+        const raw = data.translations as Record<
+          string,
+          { meaning: string; example: string }
+        >
+        const geminiEntries: Record<number, CachedWordTranslation> = {}
+
+        for (const [idKey, bundle] of Object.entries(raw)) {
+          const id = Number(idKey)
+          if (Number.isNaN(id) || !bundle?.example?.trim()) continue
+
+          const manual = resolveWordMeaningTranslation(
+            id,
+            toFetch.find((w) => w.id === id)?.meaning ?? "",
+            selectedLanguage,
+            { allowPlaceholder: false }
+          )
+
+          const meaningText = bundle.meaning?.trim()
+          geminiEntries[id] = {
+            meaning: manual ?? {
+              text: meaningText || bundle.example,
+              source: "gemini",
+            },
+            exampleNative: bundle.example.trim(),
+          }
+        }
+
+        if (Object.keys(geminiEntries).length === 0) {
+          throw new Error("번역 결과가 비어 있습니다.")
+        }
+
+        setWordTranslationCache((prev) => ({
+          ...prev,
+          [selectedLanguage]: {
+            ...prev[selectedLanguage],
+            ...geminiEntries,
+          },
+        }))
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return
+        setWordTranslationError(true)
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsTranslatingWords(false)
+        }
+      }
+    }
+
+    fetchTranslations()
+
+    return () => {
+      controller.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLanguage, todayWords])
 
   const handleWordClick = useCallback((word: string) => {
-    setDiaryText((prev) => {
-      const newText = prev.length > 0 ? `${prev} ${word}` : word
-      return newText
-    })
+    setDiaryText((prev) => appendWordToDiary(prev, word))
     setSelectedWords((prev) => (prev.includes(word) ? prev : [...prev, word]))
   }, [])
 
@@ -98,7 +230,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
             </div>
             <div>
               <h1 className="font-bold text-foreground text-lg leading-tight">자람일기</h1>
-              <p className="text-xs text-muted-foreground">한 줄 일기로 배우는 한국어</p>
+              <p className="text-xs text-muted-foreground">{ui("appTagline")}</p>
             </div>
           </div>
 
@@ -107,7 +239,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
               selectedLanguage={selectedLanguage}
               onLanguageChange={setSelectedLanguage}
             />
-            <StreakCounter streak={streak} />
+            <StreakCounter streak={streak} uiLanguage={selectedLanguage} />
           </div>
         </div>
       </header>
@@ -116,13 +248,11 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-primary" />
-            <h2 className="font-bold text-foreground text-lg">오늘의 추천 단어</h2>
+            <h2 className="font-bold text-foreground text-lg">{ui("todayWordsTitle")}</h2>
             <div className="flex-1 h-px bg-border ml-2" />
           </div>
 
-          <p className="text-muted-foreground text-sm mb-3">
-            단어 카드를 클릭하면 일기장에 단어가 들어가요! ✨
-          </p>
+          <p className="text-muted-foreground text-sm mb-3">{ui("wordCardClickHint")}</p>
 
           {showMultilingualHint && (
             <div className="mb-4 flex items-center gap-2 rounded-2xl border border-primary/25 bg-primary/5 px-3 py-2.5 text-sm text-foreground/90">
@@ -130,8 +260,10 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
                 {activeLanguage.flag}
               </span>
               <p>
-                <span className="font-semibold">{activeLanguage.label}</span> 모국어로 단어 뜻을
-                함께 보여드려요.
+                {ui("multilingualHint", { label: activeLanguage.label })}
+                {isTranslatingWords && (
+                  <span className="text-muted-foreground">{ui("translatingSuffix")}</span>
+                )}
               </p>
             </div>
           )}
@@ -143,12 +275,23 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
                 wordData={word}
                 onClick={handleWordClick}
                 isSelected={selectedWords.includes(word.word)}
+                uiLanguage={selectedLanguage}
                 translationLanguage={selectedLanguage}
-                meaningTranslation={resolveWordMeaningTranslation(
+                meaningTranslation={getWordMeaningDisplay(
                   word.id,
                   word.meaning,
-                  selectedLanguage
+                  selectedLanguage,
+                  {
+                    cache: wordTranslationCache,
+                    isLoading: isTranslatingWords,
+                    hasError: wordTranslationError,
+                  }
                 )}
+                exampleNative={getWordExampleNative(word.id, selectedLanguage, {
+                  cache: wordTranslationCache,
+                  isLoading: isTranslatingWords,
+                  hasError: wordTranslationError,
+                })}
               />
             ))}
           </div>
@@ -175,9 +318,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
               ⭐
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">
-            매일 조금씩, 한국어 실력이 쑥쑥 자라요!
-          </p>
+          <p className="text-sm text-muted-foreground">{ui("footerMessage")}</p>
         </footer>
       </main>
 
@@ -188,6 +329,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
         originalText={feedback.original}
         correctedText={feedback.corrected}
         feedback={feedback.feedbackKo}
+        uiLanguage={selectedLanguage}
         translationLanguage={selectedLanguage}
         feedbackTranslation={feedbackTranslation}
         isSuccess={isCorrectionSuccess}

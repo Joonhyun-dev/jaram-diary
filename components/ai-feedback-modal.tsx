@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { X, Sparkles, ArrowRight, Star, Languages, ChevronDown, ChevronUp } from "lucide-react"
 import confetti from "canvas-confetti"
 import { cn } from "@/lib/utils"
+import { getUiCopy } from "@/lib/ui-copy"
 import {
   getLanguage,
   getNativeTranslationButtonLabel,
@@ -20,6 +21,7 @@ interface AIFeedbackModalProps {
   originalText: string
   correctedText: string
   feedback: string
+  uiLanguage?: LanguageCode
   translationLanguage?: LanguageCode
   feedbackTranslation?: ResolvedTranslation | null
   isSuccess?: boolean
@@ -32,11 +34,14 @@ export function AIFeedbackModal({
   originalText,
   correctedText,
   feedback,
+  uiLanguage = "ko",
   translationLanguage = "ko",
   feedbackTranslation,
   isSuccess = false,
 }: AIFeedbackModalProps) {
   const [showNativeFeedback, setShowNativeFeedback] = useState(false)
+  const ui = (key: Parameters<typeof getUiCopy>[0], vars?: Record<string, string>) =>
+    getUiCopy(key, uiLanguage, vars)
   const lang = getLanguage(translationLanguage)
   const canShowNative =
     translationLanguage !== "ko" && feedbackTranslation !== null && feedbackTranslation !== undefined
@@ -115,7 +120,7 @@ export function AIFeedbackModal({
       >
         {isLoading ? (
           <div className="p-8 text-center">
-            <DialogTitle className="sr-only">AI 선생님이 읽고 있어요</DialogTitle>
+            <DialogTitle className="sr-only">{ui("modalReadingSr")}</DialogTitle>
             <div className="relative w-24 h-24 mx-auto mb-6">
               <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
               <div className="relative w-24 h-24 rounded-full bg-primary flex items-center justify-center animate-bounce-soft">
@@ -123,9 +128,9 @@ export function AIFeedbackModal({
               </div>
             </div>
             <h3 className="text-xl font-bold text-foreground mb-2">
-              AI 선생님이 읽고 있어요...
+              {ui("aiReadingTitle")}
             </h3>
-            <p className="text-muted-foreground">잠시만 기다려 주세요!</p>
+            <p className="text-muted-foreground">{ui("aiReadingWait")}</p>
 
             <div className="flex justify-center gap-2 mt-4">
               {[0, 1, 2].map((i) => (
@@ -144,13 +149,13 @@ export function AIFeedbackModal({
             <button
               onClick={onClose}
               className="absolute top-4 right-4 p-2 rounded-full hover:bg-foreground/10 transition-colors z-10"
-              aria-label="닫기"
+              aria-label={ui("modalCloseAria")}
             >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
 
             <div className="bg-gradient-to-b from-primary/30 to-transparent pt-6 pb-8 px-6 text-center">
-              <DialogTitle className="sr-only">AI 선생님의 피드백</DialogTitle>
+              <DialogTitle className="sr-only">{ui("modalFeedbackSr")}</DialogTitle>
               <div className="relative inline-block">
                 <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center shadow-lg animate-bounce-soft">
                   <span className="text-4xl">⭐</span>
@@ -161,13 +166,13 @@ export function AIFeedbackModal({
                   style={{ animationDelay: "0.5s" }}
                 />
               </div>
-              <h3 className="text-2xl font-bold text-foreground mt-4">잘했어요! 🎉</h3>
+              <h3 className="text-2xl font-bold text-foreground mt-4">{ui("modalWellDone")}</h3>
             </div>
 
             <div className="px-6 pb-6 -mt-2">
               <div className="mb-4">
                 <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  내가 쓴 문장
+                  {ui("modalMySentence")}
                 </label>
                 <div className="p-4 bg-muted rounded-2xl">
                   <p className="text-foreground">{originalText}</p>
@@ -183,7 +188,7 @@ export function AIFeedbackModal({
               <div className="mb-4">
                 <label className="text-sm font-medium text-muted-foreground mb-2 block flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  AI가 고쳐준 멋진 문장
+                  {ui("modalCorrected")}
                 </label>
                 <div className="p-4 bg-primary/20 rounded-2xl border-2 border-primary/40">
                   <p className="text-foreground font-medium">{correctedText}</p>
@@ -194,7 +199,7 @@ export function AIFeedbackModal({
                 <div className="absolute -top-2 left-6 w-4 h-4 bg-secondary rotate-45" />
                 <div className="p-4 bg-secondary rounded-2xl">
                   <p className="text-secondary-foreground">
-                    <span className="font-bold">AI 선생님:</span> {feedback}
+                    <span className="font-bold">{ui("modalAiTeacher")}</span> {feedback}
                   </p>
                 </div>
               </div>
@@ -238,7 +243,10 @@ export function AIFeedbackModal({
                           {lang.flag}
                         </span>
                         <span className="text-xs font-bold text-primary uppercase tracking-wide">
-                          {lang.nativeLabel} 피드백
+                          {getUiCopy("feedbackInLanguage", uiLanguage, {
+                            flag: "",
+                            label: lang.nativeLabel,
+                          }).trim()}
                         </span>
                         {feedbackTranslation.source === "gemini" && (
                           <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">
@@ -309,7 +317,7 @@ export function AIFeedbackModal({
                   "bg-primary text-primary-foreground hover:bg-primary/90"
                 )}
               >
-                확인했어요! 🙌
+                {ui("modalConfirm")}
               </Button>
             </div>
           </div>

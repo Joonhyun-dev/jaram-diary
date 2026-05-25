@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Sparkles, PenLine, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CorrectDiaryResponse } from "@/lib/correct-diary"
+import { clampDiaryText, DIARY_MAX_CHARS } from "@/lib/diary"
+import { getUiCopy } from "@/lib/ui-copy"
 import type { LanguageCode } from "@/lib/translations"
 
 interface DiaryInputProps {
@@ -26,8 +28,9 @@ export function DiaryInput({
   onCorrectionError,
 }: DiaryInputProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const ui = (key: Parameters<typeof getUiCopy>[0]) => getUiCopy(key, selectedLanguage)
   const charCount = value.length
-  const maxChars = 100
+  const maxChars = DIARY_MAX_CHARS
 
   const handleSubmit = async () => {
     const trimmed = value.trim()
@@ -72,8 +75,8 @@ export function DiaryInput({
               <Loader2 className="w-8 h-8 text-primary-foreground animate-spin" />
             </div>
           </div>
-          <p className="font-semibold text-foreground">AI 선생님이 읽고 있어요...</p>
-          <p className="text-sm text-muted-foreground">잠시만 기다려 주세요 ✨</p>
+          <p className="font-semibold text-foreground">{ui("aiReadingTitle")}</p>
+          <p className="text-sm text-muted-foreground">{ui("aiReadingWait")}</p>
         </div>
       )}
 
@@ -82,18 +85,16 @@ export function DiaryInput({
           <PenLine className="w-5 h-5 text-secondary-foreground" />
         </div>
         <div>
-          <h2 className="font-bold text-foreground text-lg">오늘의 일기</h2>
-          <p className="text-sm text-muted-foreground">
-            오늘 배운 단어로 일기를 한 줄 써보세요!
-          </p>
+          <h2 className="font-bold text-foreground text-lg">{ui("todayDiaryTitle")}</h2>
+          <p className="text-sm text-muted-foreground">{ui("diarySubtitle")}</p>
         </div>
       </div>
 
       <div className="relative mb-4">
         <Textarea
           value={value}
-          onChange={(e) => onChange(e.target.value.slice(0, maxChars))}
-          placeholder="여기에 일기를 써보세요... 🌸"
+          onChange={(e) => onChange(clampDiaryText(e.target.value))}
+          placeholder={ui("diaryPlaceholder")}
           disabled={isLoading}
           className={cn(
             "min-h-[140px] text-lg rounded-2xl border-2 border-border",
@@ -132,12 +133,12 @@ export function DiaryInput({
         {isLoading ? (
           <>
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span>AI 선생님이 검사 중...</span>
+            <span>{ui("aiChecking")}</span>
           </>
         ) : (
           <>
             <Sparkles className="w-5 h-5" />
-            <span>AI 선생님에게 검사받기</span>
+            <span>{ui("aiCheckButton")}</span>
             <Sparkles className="w-5 h-5" />
           </>
         )}
@@ -145,7 +146,7 @@ export function DiaryInput({
 
       {value.trim().length > 0 && value.trim().length < 5 && !isLoading && (
         <p className="text-center text-sm text-muted-foreground mt-3 animate-in fade-in">
-          조금만 더 써볼까요? (최소 5글자)
+          {ui("minCharsHint")}
         </p>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { getUiCopy } from "@/lib/ui-copy"
+
 export type LanguageCode = "ko" | "en" | "vi" | "zh" | "tl"
 
 export interface Language {
@@ -15,7 +17,12 @@ export const LANGUAGES: Language[] = [
   { code: "en", label: "영어", nativeLabel: "English", flag: "🇺🇸" },
 ]
 
-export type TranslationSource = "mapped" | "placeholder" | "gemini"
+export type TranslationSource =
+  | "mapped"
+  | "placeholder"
+  | "gemini"
+  | "loading"
+  | "error"
 
 export interface ResolvedTranslation {
   text: string
@@ -96,7 +103,8 @@ export function getLanguage(code: LanguageCode): Language {
 export function resolveWordMeaningTranslation(
   wordId: number,
   koreanMeaning: string,
-  lang: LanguageCode
+  lang: LanguageCode,
+  options?: { allowPlaceholder?: boolean }
 ): ResolvedTranslation | null {
   if (lang === "ko") return null
 
@@ -106,7 +114,68 @@ export function resolveWordMeaningTranslation(
   const byMeaning = MEANING_TRANSLATIONS[koreanMeaning.trim()]?.[lang]
   if (byMeaning) return { text: byMeaning, source: "mapped" }
 
+  if (options?.allowPlaceholder === false) return null
+
   return { text: WORD_PLACEHOLDER[lang], source: "placeholder" }
+}
+
+export interface CachedWordTranslation {
+  meaning: ResolvedTranslation
+  exampleNative: string
+}
+
+export type WordTranslationCache = Partial<
+  Record<LanguageCode, Record<number, CachedWordTranslation>>
+>
+
+export function getWordMeaningDisplay(
+  wordId: number,
+  koreanMeaning: string,
+  lang: LanguageCode,
+  options?: {
+    cache?: WordTranslationCache
+    isLoading?: boolean
+    hasError?: boolean
+  }
+): ResolvedTranslation | null {
+  if (lang === "ko") return null
+
+  const cached = options?.cache?.[lang]?.[wordId]?.meaning
+  if (cached) return cached
+
+  const manual = resolveWordMeaningTranslation(wordId, koreanMeaning, lang, {
+    allowPlaceholder: false,
+  })
+  if (manual) return manual
+
+  if (options?.isLoading) {
+    return { text: getUiCopy("meaningTranslating", lang), source: "loading" }
+  }
+
+  if (options?.hasError) {
+    return { text: getUiCopy("meaningError", lang), source: "error" }
+  }
+
+  return null
+}
+
+export function getWordExampleNative(
+  wordId: number,
+  lang: LanguageCode,
+  options?: {
+    cache?: WordTranslationCache
+    isLoading?: boolean
+    hasError?: boolean
+  }
+): string | null {
+  if (lang === "ko") return null
+
+  const native = options?.cache?.[lang]?.[wordId]?.exampleNative
+  if (native) return native
+
+  if (options?.isLoading) return null
+  if (options?.hasError) return null
+  return null
 }
 
 export function resolveFeedbackTranslation(
@@ -127,6 +196,6 @@ export function resolveFeedbackTranslation(
 
 export function getNativeTranslationButtonLabel(lang: LanguageCode): string {
   const language = getLanguage(lang)
-  if (lang === "ko") return "한국어 피드백 보기"
-  return `${language.flag} ${language.label}로 번역된 피드백 보기`
+  if (lang === "ko") return getUiCopy("feedbackViewButton", "ko")
+  return getUiCopy("nativeFeedbackButton", lang, { flag: language.flag })
 }

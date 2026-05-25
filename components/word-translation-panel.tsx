@@ -1,6 +1,6 @@
 "use client"
 
-import { Sparkles, Languages } from "lucide-react"
+import { Sparkles, Languages, Loader2, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   getLanguage,
@@ -19,14 +19,18 @@ export function WordTranslationPanel({
 }: WordTranslationPanelProps) {
   const lang = getLanguage(language)
   const isPlaceholder = translation.source === "placeholder"
+  const isLoading = translation.source === "loading"
+  const isError = translation.source === "error"
 
   return (
     <div
       className={cn(
         "mt-2 rounded-xl px-3 py-2 text-left transition-all duration-200",
-        isPlaceholder
+        isPlaceholder || isLoading
           ? "border border-dashed border-foreground/20 bg-card/40"
-          : "border border-foreground/10 bg-card/60 shadow-sm"
+          : isError
+            ? "border border-dashed border-destructive/30 bg-destructive/5"
+            : "border border-foreground/10 bg-card/60 shadow-sm"
       )}
     >
       <div className="flex items-center gap-1.5 mb-1">
@@ -42,17 +46,33 @@ export function WordTranslationPanel({
             AI
           </span>
         )}
+        {isLoading && (
+          <span className="ml-auto inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+            번역 중
+          </span>
+        )}
         {isPlaceholder && (
           <span className="ml-auto inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
             <Languages className="w-2.5 h-2.5" />
             준비 중
           </span>
         )}
+        {isError && (
+          <span className="ml-auto inline-flex items-center gap-0.5 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] text-destructive">
+            <AlertCircle className="w-2.5 h-2.5" />
+            오류
+          </span>
+        )}
       </div>
       <p
         className={cn(
           "text-sm leading-snug",
-          isPlaceholder ? "text-muted-foreground italic" : "text-foreground/85 font-medium"
+          isPlaceholder || isLoading
+            ? "text-muted-foreground italic"
+            : isError
+              ? "text-destructive/90"
+              : "text-foreground/85 font-medium"
         )}
       >
         {translation.text}

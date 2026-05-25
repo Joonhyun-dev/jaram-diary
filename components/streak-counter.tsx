@@ -2,12 +2,16 @@
 
 import { Flame } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getUiCopy } from "@/lib/ui-copy"
+import type { LanguageCode } from "@/lib/translations"
 
 interface StreakCounterProps {
   streak: number
+  uiLanguage: LanguageCode
 }
 
-export function StreakCounter({ streak }: StreakCounterProps) {
+export function StreakCounter({ streak, uiLanguage }: StreakCounterProps) {
+  const ui = (key: Parameters<typeof getUiCopy>[0]) => getUiCopy(key, uiLanguage)
   return (
     <div className={cn(
       "flex items-center gap-2 px-4 py-2 rounded-full",
@@ -25,7 +29,7 @@ export function StreakCounter({ streak }: StreakCounterProps) {
         )} />
       </div>
       <div className="text-sm">
-        <span className="text-muted-foreground">연속 일기 작성일수:</span>
+        <span className="text-muted-foreground">{ui("streakLabel")}</span>
         <span className={cn(
           "font-bold ml-1",
           streak > 0 ? "text-orange-500" : "text-foreground"
