@@ -6,12 +6,14 @@ import { DiaryInput } from "@/components/diary-input"
 import { AIFeedbackModal } from "@/components/ai-feedback-modal"
 import { StreakCounter } from "@/components/streak-counter"
 import { LanguageSelector } from "@/components/language-selector"
+import { useLanguage } from "@/components/language-provider"
 import { Sparkles, BookOpen } from "lucide-react"
 import type { CorrectDiaryResponse } from "@/lib/correct-diary"
 import { appendWordToDiary } from "@/lib/diary"
 import { trimExample, trimMeaning } from "@/lib/translate-words"
 import { getUiCopy } from "@/lib/ui-copy"
 import { upsertWordbookEntry } from "@/lib/wordbook"
+import { addArchiveEntry } from "@/lib/archive"
 import {
   type CachedWordTranslation,
   type LanguageCode,
@@ -61,7 +63,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
     feedbackTranslation: "",
   })
   const [streak] = useState(0)
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("ko")
+  const { language: selectedLanguage, setLanguage: setSelectedLanguage } = useLanguage()
   const [wordTranslationCache, setWordTranslationCache] =
     useState<WordTranslationCache>({})
   const [isTranslatingWords, setIsTranslatingWords] = useState(false)
@@ -200,6 +202,12 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
   }, [diaryText])
 
   const handleCorrectionComplete = useCallback((result: CorrectDiaryResponse) => {
+    addArchiveEntry({
+      original: result.original,
+      corrected: result.corrected,
+      feedback: result.feedback_ko,
+      language: selectedLanguage,
+    })
     setFeedback({
       original: result.original,
       corrected: result.corrected,
@@ -208,7 +216,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
     })
     setIsCorrectionSuccess(true)
     setIsModalLoading(false)
-  }, [])
+  }, [selectedLanguage])
 
   const handleCorrectionError = useCallback((message: string) => {
     setFeedback({

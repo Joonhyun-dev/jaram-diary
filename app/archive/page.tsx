@@ -1,55 +1,32 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Calendar } from "@/components/ui/calendar"
 import { BookOpen, Calendar as CalendarIcon, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, isSameDay } from "date-fns"
-
-type DiaryEntry = {
-  id: string
-  date: Date
-  original: string
-  corrected: string
-  feedback: string
-  isSample?: boolean
-}
-
-const SAMPLE_ENTRIES: DiaryEntry[] = [
-  {
-    id: "2026-05-20",
-    date: new Date(2026, 4, 20),
-    original: "오늘은 친구와 공원에 갔다.",
-    corrected: "오늘은 친구와 공원에 갔다.",
-    feedback: "자연스럽고 예쁜 문장이에요! 계속 이렇게 써보세요.",
-    isSample: true,
-  },
-  {
-    id: "2026-05-22",
-    date: new Date(2026, 4, 22),
-    original: "나는 학교에서 새 단어를 배웠다.",
-    corrected: "나는 학교에서 새 단어를 배웠다.",
-    feedback: "오늘 배운 단어를 잘 사용했어요. 멋져요!",
-    isSample: true,
-  },
-  {
-    id: "2026-05-24",
-    date: new Date(2026, 4, 24),
-    original: "비가 와서 집에서 책을 읽었다.",
-    corrected: "비가 와서 집에서 책을 읽었다.",
-    feedback: "날씨와 행동을 잘 연결해서 쓴 멋진 일기예요.",
-    isSample: true,
-  },
-]
+import { loadArchiveEntries, type DiaryArchiveEntry } from "@/lib/archive"
 
 export default function ArchivePage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
-  const entries = SAMPLE_ENTRIES
+  const [entries, setEntries] = useState<DiaryArchiveEntry[]>([])
 
-  const entryDates = useMemo(() => entries.map((entry) => entry.date), [entries])
+  useEffect(() => {
+    const stored = loadArchiveEntries()
+    setEntries(stored)
+    if (stored[0]) {
+      setSelectedDate(new Date(stored[0].createdAt))
+    }
+  }, [])
+
+  const entryDates = useMemo(
+    () => entries.map((entry) => new Date(entry.createdAt)),
+    [entries]
+  )
   const activeDate = selectedDate ?? new Date()
   const selectedEntries = useMemo(
-    () => entries.filter((entry) => isSameDay(entry.date, activeDate)),
+    () =>
+      entries.filter((entry) => isSameDay(new Date(entry.createdAt), activeDate)),
     [entries, activeDate]
   )
 
@@ -82,9 +59,6 @@ export default function ArchivePage() {
           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
             <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
             저장된 일기
-            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase">
-              샘플
-            </span>
           </div>
         </section>
 
@@ -115,11 +89,6 @@ export default function ArchivePage() {
                     <span className="text-sm font-semibold text-foreground">
                       나의 문장
                     </span>
-                    {entry.isSample && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
-                        샘플
-                      </span>
-                    )}
                   </div>
                   <p className="mt-2 text-sm text-foreground/90">{entry.original}</p>
 

@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/", label: "홈" },
   { href: "/archive", label: "일기 보관함" },
   { href: "/wordbook", label: "나만의 단어장" },
+  { href: "/my", label: "마이페이지" },
 ]
 
 export function NavBar() {
