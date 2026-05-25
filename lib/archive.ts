@@ -1,3 +1,4 @@
+import { isSameDay, startOfDay, subDays } from "date-fns"
 import type { LanguageCode } from "@/lib/translations"
 
 export interface DiaryArchiveEntry {
@@ -68,4 +69,59 @@ export function addArchiveEntry(
   const next = [nextEntry, ...entries]
   persistArchive(next)
   return next
+}
+
+export function removeArchiveEntry(id: string): DiaryArchiveEntry[] {
+  if (typeof window === "undefined") return []
+  const entries = loadArchiveEntries()
+  const next = entries.filter((entry) => entry.id !== id)
+  persistArchive(next)
+  return next
+}
+
+export function updateArchiveEntry(
+  id: string,
+  updates: Partial<Pick<DiaryArchiveEntry, "original" | "corrected" | "feedback">>
+): DiaryArchiveEntry[] {
+  if (typeof window === "undefined") return []
+  const entries = loadArchiveEntries()
+  const next = entries.map((entry) =>
+    entry.id === id ? { ...entry, ...updates } : entry
+  )
+  persistArchive(next)
+  return next
+}
+
+export function getArchiveStreak(
+  entries: DiaryArchiveEntry[],
+  today: Date = new Date()
+): number {
+  if (entries.length === 0) return 0
+
+  const dayTimes = Array.from(
+    new Set(
+      entries.flatMap((entry) => {
+        const date = new Date(entry.createdAt)
+        if (Number.isNaN(date.getTime())) return []
+        return startOfDay(date).getTime()
+      })
+    )
+  ).sort((a, b) => b - a)
+
+  if (dayTimes.length === 0) return 0
+
+  let streak = 0
+  let cursor = startOfDay(today)
+
+  for (const time of dayTimes) {
+    if (time > cursor.getTime()) continue
+    if (isSameDay(new Date(time), cursor)) {
+      streak += 1
+      cursor = subDays(cursor, 1)
+      continue
+    }
+    break
+  }
+
+  return streak
 }

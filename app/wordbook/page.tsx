@@ -9,12 +9,30 @@ import {
   removeWordbookEntry,
   type WordbookEntry,
 } from "@/lib/wordbook"
+import { useLanguage } from "@/components/language-provider"
+import { getLanguage } from "@/lib/translations"
 
 type SortOption = "recent" | "alphabetical"
+
+const ENTITY_MAP: Record<string, string> = {
+  "&lsquo;": "‘",
+  "&rsquo;": "’",
+  "&ldquo;": "“",
+  "&rdquo;": "”",
+  "&quot;": '"',
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text.replace(/&(lsquo|rsquo|ldquo|rdquo|quot);/g, (match) => {
+    return ENTITY_MAP[match] ?? match
+  })
+}
 
 export default function WordbookPage() {
   const [entries, setEntries] = useState<WordbookEntry[]>([])
   const [query, setQuery] = useState("")
+  const { language } = useLanguage()
+  const activeLanguage = getLanguage(language)
   const [sortOption, setSortOption] = useState<SortOption>("recent")
 
   useEffect(() => {
@@ -140,6 +158,27 @@ export default function WordbookPage() {
                     "transition-shadow hover:shadow-md"
                   )}
                 >
+                  {(() => {
+                    const meaningText = decodeHtmlEntities(entry.meaning)
+                    const exampleText = decodeHtmlEntities(entry.exampleSentence)
+                    const translation = entry.translations?.[language]
+                    const translatedMeaning = translation?.meaning
+                      ? decodeHtmlEntities(translation.meaning)
+                      : null
+                    const translatedExample = translation?.example
+                      ? decodeHtmlEntities(translation.example)
+                      : null
+
+                    return (
+                      <>
+                  {language !== "ko" && entry.translations?.[language] && (
+                    <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="text-base" aria-hidden="true">
+                        {activeLanguage.flag}
+                      </span>
+                      <span>{activeLanguage.nativeLabel}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h2 className="text-xl font-bold text-foreground">{entry.word}</h2>
@@ -167,11 +206,24 @@ export default function WordbookPage() {
                     </div>
                   </div>
 
-                  <p className="mt-3 text-foreground/90 font-medium">{entry.meaning}</p>
+                  <p className="mt-3 text-foreground/90 font-medium">{meaningText}</p>
+                  {language !== "ko" && translatedMeaning && (
+                    <p className="mt-1 text-sm text-muted-foreground italic">
+                      {translatedMeaning}
+                    </p>
+                  )}
 
                   <p className="mt-2 text-sm text-muted-foreground">
-                    &quot;{entry.exampleSentence}&quot;
+                    &quot;{exampleText}&quot;
                   </p>
+                  {language !== "ko" && translatedExample && (
+                    <p className="mt-1 text-sm text-muted-foreground italic">
+                      &quot;{translatedExample}&quot;
+                    </p>
+                  )}
+                      </>
+                    )
+                  })()}
                 </article>
               ))}
             </div>

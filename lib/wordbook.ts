@@ -1,3 +1,5 @@
+import type { LanguageCode } from "@/lib/translations"
+
 export interface WordbookEntry {
   id: number
   word: string
@@ -5,6 +7,7 @@ export interface WordbookEntry {
   meaning: string
   exampleSentence: string
   savedAt: string
+  translations?: Partial<Record<LanguageCode, { meaning?: string; example?: string }>>
 }
 
 const WORDBOOK_STORAGE_KEY = "jaram-wordbook"
@@ -43,8 +46,21 @@ export function loadWordbookEntries(): WordbookEntry[] {
 export function upsertWordbookEntry(entry: WordbookEntry): WordbookEntry[] {
   if (typeof window === "undefined") return []
   const entries = loadWordbookEntries()
+  const existing = entries.find((item) => item.id === entry.id)
+  const mergedTranslations =
+    existing?.translations || entry.translations
+      ? {
+          ...existing?.translations,
+          ...entry.translations,
+        }
+      : undefined
+  const nextEntry: WordbookEntry = {
+    ...existing,
+    ...entry,
+    translations: mergedTranslations,
+  }
   const next = entries.filter((item) => item.id !== entry.id)
-  next.unshift(entry)
+  next.unshift(nextEntry)
   persistWordbook(next)
   return next
 }

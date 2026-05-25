@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type MouseEvent } from "react"
 import { ChevronDown, ChevronUp, Volume2, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { WordTranslationPanel } from "@/components/word-translation-panel"
@@ -16,9 +16,16 @@ export interface WordData {
   color: "yellow" | "mint" | "pink"
 }
 
+export type WordCardClickPayload = {
+  wordData: WordData
+  translationLanguage?: LanguageCode
+  meaningTranslation?: ResolvedTranslation | null
+  exampleNative?: string | null
+}
+
 interface WordCardProps {
   wordData: WordData
-  onClick: (word: WordData) => void
+  onClick: (payload: WordCardClickPayload) => void
   isSelected: boolean
   uiLanguage: LanguageCode
   translationLanguage?: LanguageCode
@@ -47,6 +54,22 @@ export function WordCard({
   const showBilingualExample = translationLanguage && translationLanguage !== "ko"
   const [showHint, setShowHint] = useState(false)
 
+  const handleSpeak = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return
+
+    const utterance = new SpeechSynthesisUtterance(wordData.word)
+    utterance.lang = "ko-KR"
+    const voices = window.speechSynthesis.getVoices()
+    const koVoice =
+      voices.find((voice) => voice.lang === "ko-KR") ??
+      voices.find((voice) => voice.lang.startsWith("ko"))
+    if (koVoice) utterance.voice = koVoice
+
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
+  }
+
   return (
     <div
       className={cn(
@@ -55,7 +78,14 @@ export function WordCard({
         colorClasses[wordData.color],
         isSelected && "ring-4 ring-primary ring-offset-2 scale-105"
       )}
-      onClick={() => onClick(wordData)}
+      onClick={() =>
+        onClick({
+          wordData,
+          translationLanguage,
+          meaningTranslation,
+          exampleNative,
+        })
+      }
     >
       <div className="absolute top-2 right-2 w-6 h-6 opacity-30">
         <svg viewBox="0 0 24 24" fill="currentColor">
@@ -69,9 +99,7 @@ export function WordCard({
           <span className="text-sm text-muted-foreground">[{wordData.pronunciation}]</span>
           <button
             className="p-1 rounded-full hover:bg-foreground/10 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation()
-            }}
+            onClick={handleSpeak}
             aria-label={ui("listenPronunciation")}
           >
             <Volume2 className="w-4 h-4 text-muted-foreground" />

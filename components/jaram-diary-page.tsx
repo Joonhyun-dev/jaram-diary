@@ -1,7 +1,11 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import { WordCard, type WordData } from "@/components/word-card"
+import {
+  WordCard,
+  type WordCardClickPayload,
+  type WordData,
+} from "@/components/word-card"
 import { DiaryInput } from "@/components/diary-input"
 import { AIFeedbackModal } from "@/components/ai-feedback-modal"
 import { StreakCounter } from "@/components/streak-counter"
@@ -13,7 +17,11 @@ import { appendWordToDiary } from "@/lib/diary"
 import { trimExample, trimMeaning } from "@/lib/translate-words"
 import { getUiCopy } from "@/lib/ui-copy"
 import { upsertWordbookEntry } from "@/lib/wordbook"
-import { addArchiveEntry } from "@/lib/archive"
+import {
+  addArchiveEntry,
+  getArchiveStreak,
+  loadArchiveEntries,
+} from "@/lib/archive"
 import {
   type CachedWordTranslation,
   type LanguageCode,
@@ -62,7 +70,7 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
     feedbackKo: "",
     feedbackTranslation: "",
   })
-  const [streak] = useState(0)
+  const [streak, setStreak] = useState(0)
   const { language: selectedLanguage, setLanguage: setSelectedLanguage } = useLanguage()
   const [wordTranslationCache, setWordTranslationCache] =
     useState<WordTranslationCache>({})
@@ -74,6 +82,10 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
   const showMultilingualHint = selectedLanguage !== "ko"
   const ui = (key: Parameters<typeof getUiCopy>[0], vars?: Record<string, string>) =>
     getUiCopy(key, selectedLanguage, vars)
+
+  useEffect(() => {
+    setStreak(getArchiveStreak(loadArchiveEntries()))
+  }, [])
 
   useEffect(() => {
     if (selectedLanguage === "ko") {
@@ -176,16 +188,42 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLanguage, todayWords])
 
-  const handleWordClick = useCallback((word: WordData) => {
-    setDiaryText((prev) => appendWordToDiary(prev, word.word))
-    setSelectedWords((prev) => (prev.includes(word.word) ? prev : [...prev, word.word]))
+  const handleWordClick = useCallback((payload: WordCardClickPayload) => {
+    const { wordData, translationLanguage, meaningTranslation, exampleNative } = payload
+    setDiaryText((prev) => appendWordToDiary(prev, wordData.word))
+    setSelectedWords((prev) =>
+      prev.includes(wordData.word) ? prev : [...prev, wordData.word]
+    )
+
+    const hasMeaning =
+      meaningTranslation &&
+      meaningTranslation.source !== "loading" &&
+      meaningTranslation.source !== "error" &&
+      meaningTranslation.source !== "placeholder"
+        ? meaningTranslation.text
+        : undefined
+    const hasExample = exampleNative?.trim() ? exampleNative : undefined
+
+    const translations =
+      translationLanguage &&
+      translationLanguage !== "ko" &&
+      (hasMeaning || hasExample)
+        ? {
+            [translationLanguage]: {
+              meaning: hasMeaning,
+              example: hasExample,
+            },
+          }
+        : undefined
+
     upsertWordbookEntry({
-      id: word.id,
-      word: word.word,
-      pronunciation: word.pronunciation,
-      meaning: word.meaning,
-      exampleSentence: word.exampleSentence,
+      id: wordData.id,
+      word: wordData.word,
+      pronunciation: wordData.pronunciation,
+      meaning: wordData.meaning,
+      exampleSentence: wordData.exampleSentence,
       savedAt: new Date().toISOString(),
+      translations,
     })
   }, [])
 
@@ -202,12 +240,13 @@ export function JaramDiaryPage({ todayWords }: JaramDiaryPageProps) {
   }, [diaryText])
 
   const handleCorrectionComplete = useCallback((result: CorrectDiaryResponse) => {
-    addArchiveEntry({
+    const nextEntries = addArchiveEntry({
       original: result.original,
       corrected: result.corrected,
       feedback: result.feedback_ko,
       language: selectedLanguage,
     })
+    setStreak(getArchiveStreak(nextEntries))
     setFeedback({
       original: result.original,
       corrected: result.corrected,
